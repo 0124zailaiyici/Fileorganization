@@ -1,10 +1,13 @@
 {
   "name": "download-organizer",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "type": "module",
+  "bin": {
+    "download-organizer": "dist/index.js"
+  },
   "scripts": {
     "dev": "tsx src/index.ts",
-    "build": "tsc",
+    "build": "tsc && node --input-type=module -e \"import{writeFileSync,readFileSync}from'fs';const f='dist/index.js';writeFileSync(f,'#!/usr/bin/env node\\n'+readFileSync(f,'utf-8'))\"",
     "organize": "tsx src/index.ts organize",
     "watch": "tsx src/index.ts watch"
   },
