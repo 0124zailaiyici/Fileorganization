@@ -2,3 +2,5 @@ node_modules/
 dist/
 *.tmp
 .env
+.claude/
+.download-organizer*.json
