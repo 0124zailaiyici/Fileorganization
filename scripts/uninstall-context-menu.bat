@@ -1,4 +1,4 @@
 @echo off
 reg delete "HKEY_CLASSES_ROOT\Directory\shell\DownloadOrganizer" /f
-echo 右键菜单已卸载
+if %errorlevel%==0 (echo context menu removed) else (echo failed - run as administrator)
 pause

@@ -1,0 +1,8 @@
+Windows Registry Editor Version 5.00
+
+[HKEY_CLASSES_ROOT\Directory\shell\DownloadOrganizer]
+@="智能整理此文件夹"
+"Icon"="shell32.dll,167"
+
+[HKEY_CLASSES_ROOT\Directory\shell\DownloadOrganizer\command]
+@="cmd.exe /k \"D:\\demo\\AI\\claude\\Fileorganization\\scripts\\context-menu.bat\" \"%1\""
