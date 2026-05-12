@@ -7,7 +7,7 @@ import { getExt } from "./classifier.js";
 
 export function createCLI(
   onOrganize: (config: Config, dryRun: boolean, dedupe: boolean) => Promise<void>,
-  onWatch: (config: Config) => Promise<void>,
+  onWatch: (config: Config, paths: string[]) => Promise<void>,
   getStatus: (config: Config) => string,
   onUndo: (config: Config, dryRun: boolean) => Promise<void>,
 ): Command {
@@ -40,12 +40,12 @@ export function createCLI(
   program
     .command("watch")
     .description("启动后台文件监控，新文件自动归类")
-    .option("-p, --path <path>", "监控目录路径，默认当前目录")
+    .option("-p, --path <path...>", "监控目录路径，默认当前目录")
     .action(async (opts) => {
       const config = loadConfig();
-      if (opts.path) config.targetPath = resolve(opts.path);
-      console.log(`👀 开始监控: ${config.targetPath}`);
-      await onWatch(config);
+      const paths: string[] = (opts.path as string[] | undefined)?.map((p: string) => resolve(p)) ?? [config.targetPath];
+      console.log(`👀 开始监控 ${paths.length} 个目录`);
+      await onWatch(config, paths);
     });
 
   const ruleCmd = program.command("rule").description("管理自定义分类规则");

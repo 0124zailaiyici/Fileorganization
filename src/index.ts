@@ -64,15 +64,21 @@ async function handleUndo(config: Config, dryRun: boolean): Promise<void> {
   if (!dryRun) saveHistory();
 }
 
-async function handleWatch(config: Config): Promise<void> {
+async function handleWatch(config: Config, paths: string[]): Promise<void> {
   const rules = getEffectiveRules(config);
   const classifyFn = config.aiEnabled ? aiClassify : undefined;
-  const watcher = startWatcher(config, rules, classifyFn);
+
+  const watchers = paths.map((p) => {
+    const cfg = { ...config, targetPath: p };
+    const w = startWatcher(cfg, rules, classifyFn);
+    console.log(`   ${p}`);
+    return w;
+  });
 
   const shutdown = () => {
     saveCache();
     saveHistory();
-    watcher.close();
+    for (const w of watchers) w.close();
     process.exit(0);
   };
   process.once("SIGINT", shutdown);
