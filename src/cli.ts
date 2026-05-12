@@ -16,7 +16,7 @@ export function createCLI(
   program
     .name("download-organizer")
     .description("智能下载文件夹管家 — 自动归类文件，支持 AI 增强分类")
-    .version("1.0.0");
+    .version("2.1.0");
 
   program
     .command("organize")

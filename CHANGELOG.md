@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.1.0] - 2026-05-12
+
+### Added
+- **Windows 右键菜单**：文件夹右键 "智能整理此文件夹"，一键整理当前目录
+- **多目录监控**：`watch --path A --path B` 同时监控多个下载目录
+- **开机自启**：VBS 静默脚本实现 Windows 开机自动启动后台监控
+
+### Fixed
+- 修复右键菜单中文显示乱码（`.reg` UTF-16 LE 编码问题）
+- 修复 `chcp 65001` 导致批处理重定向解析失败
+- 最终方案：Node.js 脚本直接操作注册表，彻底绕过所有编码环节
+
 ## [2.0.0] - 2026-05-12
 
 ### Added
@@ -15,6 +27,7 @@ All notable changes to this project will be documented in this file.
 - **系统文件忽略**：`desktop.ini`、`Thumbs.db`、`.DS_Store` 等默认跳过
 - **预览模式**：`--dry-run` 查看计划而不实际移动文件
 - **规则管理**：`rule add/remove/list` 自定义扩展名分类规则
+- **全球安装**：`npm link` 后全局可用 `download-organizer` 命令
 
 ### Fixed
 - 修复 `.htm` 文件未正确归类到 Documents
@@ -27,4 +40,5 @@ All notable changes to this project will be documented in this file.
 - 防抖加载：下载中的文件 (.crdownload/.part/.tmp) 不处理
 - API Key 隔离：通过 dotenv 管理，不提交至仓库
 
-[2.0.0]: https://github.com/
+[2.1.0]: https://github.com/0124zailaiyici/Fileorganization/compare/v2.0.0...v2.1.0
+[2.0.0]: https://github.com/0124zailaiyici/Fileorganization/releases/tag/v2.0.0
