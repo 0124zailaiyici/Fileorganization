@@ -1,0 +1,106 @@
+import { Command } from "commander";
+import { loadConfig, saveConfig, DEFAULT_RULES } from "./config.js";
+import type { Config, Rule } from "./types.js";
+import { ALL_CATEGORIES } from "./types.js";
+import { getExt } from "./classifier.js";
+
+export function createCLI(
+  onOrganize: (config: Config, dryRun: boolean) => Promise<void>,
+  onWatch: (config: Config) => Promise<void>,
+  getStatus: (config: Config) => string,
+): Command {
+  const program = new Command();
+
+  program
+    .name("download-organizer")
+    .description("智能下载文件夹管家 — 自动归类文件，支持 AI 增强分类")
+    .version("1.0.0");
+
+  program
+    .command("organize")
+    .description("整理目标目录中的文件")
+    .option("-p, --path <path>", "目标目录路径，默认当前目录")
+    .option("-d, --dry-run", "预览模式，只显示计划不实际移动")
+    .action(async (opts) => {
+      const config = loadConfig();
+      if (opts.path) config.targetPath = opts.path;
+      await onOrganize(config, opts.dryRun ?? false);
+    });
+
+  program
+    .command("watch")
+    .description("启动后台文件监控，新文件自动归类")
+    .option("-p, --path <path>", "监控目录路径，默认当前目录")
+    .action(async (opts) => {
+      const config = loadConfig();
+      if (opts.path) config.targetPath = opts.path;
+      console.log(`👀 开始监控: ${config.targetPath}`);
+      await onWatch(config);
+    });
+
+  const ruleCmd = program.command("rule").description("管理自定义分类规则");
+
+  ruleCmd
+    .command("add <extension> <category>")
+    .description("添加自定义规则")
+    .action((extension: string, category: string) => {
+      if (!ALL_CATEGORIES.includes(category as typeof ALL_CATEGORIES[number])) {
+        console.error(`无效类别: ${category}。可选: ${ALL_CATEGORIES.join(", ")}`);
+        process.exit(1);
+      }
+      const config = loadConfig();
+      const ext = getExt(extension) || extension.toLowerCase();
+      const existing = config.customRules.find((r) => r.category === category);
+      if (existing) {
+        if (!existing.extensions.includes(ext)) existing.extensions.push(ext);
+      } else {
+        config.customRules.push({ extensions: [ext], category: category as typeof ALL_CATEGORIES[number] });
+      }
+      saveConfig(config);
+      console.log(`已添加规则: .${ext} → ${category}`);
+    });
+
+  ruleCmd
+    .command("list")
+    .description("列出所有规则")
+    .action(() => printRules(loadConfig()));
+
+  ruleCmd
+    .command("remove <extension> <category>")
+    .description("移除自定义规则")
+    .action((extension: string, category: string) => {
+      const config = loadConfig();
+      const ext = getExt(extension) || extension.toLowerCase();
+      const rule = config.customRules.find((r) => r.category === category);
+      if (rule) {
+        rule.extensions = rule.extensions.filter((e) => e !== ext);
+        if (rule.extensions.length === 0) {
+          config.customRules = config.customRules.filter((r) => r !== rule);
+        }
+        saveConfig(config);
+        console.log(`已移除规则: .${ext} → ${category}`);
+      } else {
+        console.log("未找到该规则");
+      }
+    });
+
+  program
+    .command("status")
+    .description("查看当前配置和监控状态")
+    .action(() => console.log(getStatus(loadConfig())));
+
+  return program;
+}
+
+function printRules(config: Config): void {
+  console.log("\n📋 内置规则:");
+  for (const rule of DEFAULT_RULES) {
+    console.log(`  ${rule.category}: ${rule.extensions.map((e) => "." + e).join(", ")}`);
+  }
+  if (config.customRules.length > 0) {
+    console.log("\n✏️  自定义规则:");
+    for (const rule of config.customRules) {
+      console.log(`  ${rule.category}: ${rule.extensions.map((e) => "." + e).join(", ")}`);
+    }
+  }
+}
