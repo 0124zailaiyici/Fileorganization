@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 import type { Config, Rule } from "./types.js";
 
 export const DEFAULT_RULES: Rule[] = [
-  { extensions: ["pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt", "md", "csv", "odt", "ods", "rtf"], category: "Documents" },
+  { extensions: ["pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt", "md", "csv", "html", "htm", "odt", "ods", "rtf"], category: "Documents" },
   { extensions: ["png", "jpg", "jpeg", "gif", "webp", "bmp", "svg", "ico", "tiff", "tif", "heic", "heif", "raw"], category: "Images" },
   { extensions: ["exe", "msi", "dmg", "pkg", "deb", "rpm", "appx", "apk"], category: "Installers" },
   { extensions: ["zip", "rar", "7z", "tar", "gz", "bz2", "xz", "tgz", "tar.gz", "tar.bz2", "tar.xz", "iso"], category: "Archives" },
@@ -17,7 +17,7 @@ const CACHE_FILENAME = ".download-organizer-cache.json";
 
 /** 缓存预计算的有效规则 */
 let _cachedRules: Rule[] | null = null;
-let _cachedCustomRuleCount = -1;
+let _cachedRulesKey = "";
 
 export function getConfigPath(): string {
   return resolve(process.cwd(), CONFIG_FILENAME);
@@ -32,7 +32,7 @@ export function getDefaultConfig(): Config {
     targetPath: process.cwd(),
     customRules: [],
     aiEnabled: true,
-    ignorePatterns: ["node_modules/**", ".git/**", "*.crdownload", "*.part", "*.tmp"],
+    ignorePatterns: ["node_modules/**", ".git/**", "*.crdownload", "*.part", "*.tmp", "desktop.ini", "Thumbs.db", ".DS_Store", "**/$RECYCLE.BIN/**", "**/System Volume Information/**"],
     recursive: false,
     stabilityThreshold: 2000,
   };
@@ -43,8 +43,16 @@ export function loadConfig(): Config {
   if (!existsSync(configPath)) return getDefaultConfig();
 
   const raw = readFileSync(configPath, "utf-8");
-  const userConfig = JSON.parse(raw) as Partial<Config>;
-  return { ...getDefaultConfig(), ...userConfig };
+  const parsed = JSON.parse(raw);
+  if (typeof parsed !== "object" || parsed === null) {
+    throw new Error("配置文件格式无效");
+  }
+  const merged = { ...getDefaultConfig(), ...parsed };
+  if (typeof merged.targetPath !== "string") merged.targetPath = getDefaultConfig().targetPath;
+  if (!Array.isArray(merged.customRules)) merged.customRules = [];
+  if (!Array.isArray(merged.ignorePatterns)) merged.ignorePatterns = [];
+  if (typeof merged.stabilityThreshold !== "number") merged.stabilityThreshold = 2000;
+  return merged as Config;
 }
 
 export function saveConfig(config: Config): void {
@@ -54,10 +62,11 @@ export function saveConfig(config: Config): void {
 
 /** 获取有效规则（合并自定义+内置），结果会被缓存 */
 export function getEffectiveRules(config: Config): Rule[] {
-  if (_cachedRules && _cachedCustomRuleCount === config.customRules.length) {
+  const key = JSON.stringify(config.customRules);
+  if (_cachedRules && _cachedRulesKey === key) {
     return _cachedRules;
   }
   _cachedRules = [...config.customRules, ...DEFAULT_RULES];
-  _cachedCustomRuleCount = config.customRules.length;
+  _cachedRulesKey = key;
   return _cachedRules;
 }

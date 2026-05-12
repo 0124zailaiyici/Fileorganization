@@ -1,13 +1,15 @@
 import { Command } from "commander";
+import { resolve } from "node:path";
 import { loadConfig, saveConfig, DEFAULT_RULES } from "./config.js";
-import type { Config, Rule } from "./types.js";
+import type { Config } from "./types.js";
 import { ALL_CATEGORIES } from "./types.js";
 import { getExt } from "./classifier.js";
 
 export function createCLI(
-  onOrganize: (config: Config, dryRun: boolean) => Promise<void>,
+  onOrganize: (config: Config, dryRun: boolean, dedupe: boolean) => Promise<void>,
   onWatch: (config: Config) => Promise<void>,
   getStatus: (config: Config) => string,
+  onUndo: (config: Config, dryRun: boolean) => Promise<void>,
 ): Command {
   const program = new Command();
 
@@ -21,10 +23,18 @@ export function createCLI(
     .description("整理目标目录中的文件")
     .option("-p, --path <path>", "目标目录路径，默认当前目录")
     .option("-d, --dry-run", "预览模式，只显示计划不实际移动")
+    .option("-r, --recursive", "递归扫描子目录")
+    .option("-u, --undo", "撤销最近一次整理操作")
+    .option("--dedupe", "基于内容哈希检测并跳过重复文件")
     .action(async (opts) => {
       const config = loadConfig();
-      if (opts.path) config.targetPath = opts.path;
-      await onOrganize(config, opts.dryRun ?? false);
+      if (opts.path) config.targetPath = resolve(opts.path);
+      if (opts.recursive) config.recursive = true;
+      if (opts.undo) {
+        await onUndo(config, opts.dryRun ?? false);
+      } else {
+        await onOrganize(config, opts.dryRun ?? false, opts.dedupe ?? false);
+      }
     });
 
   program
@@ -33,7 +43,7 @@ export function createCLI(
     .option("-p, --path <path>", "监控目录路径，默认当前目录")
     .action(async (opts) => {
       const config = loadConfig();
-      if (opts.path) config.targetPath = opts.path;
+      if (opts.path) config.targetPath = resolve(opts.path);
       console.log(`👀 开始监控: ${config.targetPath}`);
       await onWatch(config);
     });

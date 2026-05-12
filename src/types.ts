@@ -58,4 +58,24 @@ export interface OrganizeDetail {
   category: FileCategory;
   success: boolean;
   error?: string;
+  duplicate?: boolean;
+  duplicateOf?: string;
+}
+
+export interface OperationRecord {
+  batchId: string;
+  timestamp: string;
+  source: string;
+  dest: string;
+  fileName: string;
+  category: FileCategory;
+}
+
+export interface UndoResult {
+  batchId: string;
+  timestamp: string;
+  total: number;
+  reverted: number;
+  errors: number;
+  details: Array<{ fileName: string; from: string; to: string; success: boolean; error?: string }>;
 }

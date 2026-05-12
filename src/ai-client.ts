@@ -20,18 +20,9 @@ function loadCache(): Map<string, AICacheEntry> {
   return memoryCache;
 }
 
-function saveCache(): void {
+export function saveCache(): void {
   if (!memoryCache) return;
   writeFileSync(getCachePath(), JSON.stringify([...memoryCache.values()], null, 2), "utf-8");
-}
-
-/** 注册进程退出时写入缓存 */
-let _exitHookInstalled = false;
-function ensureExitHook(): void {
-  if (_exitHookInstalled) return;
-  _exitHookInstalled = true;
-  process.on("exit", saveCache);
-  process.on("SIGINT", () => { saveCache(); process.exit(0); });
 }
 
 let _client: Anthropic | null | undefined = undefined;
@@ -94,11 +85,9 @@ export async function aiClassify(
     const reason: string = parsed.reason ?? "AI 分类";
 
     cache.set(ext, { extension: ext, fileNamePattern: "*", category, reason, createdAt: new Date().toISOString() });
-    ensureExitHook();
 
     return { category, matchedRule: null, aiGenerated: true, reason };
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return { category: "Others", matchedRule: null, aiGenerated: true, reason: `AI 调用失败: ${msg}` };
+  } catch {
+    return { category: "Others", matchedRule: null, aiGenerated: true, reason: "AI 调用失败" };
   }
 }

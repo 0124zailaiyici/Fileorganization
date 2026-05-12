@@ -1,5 +1,5 @@
 import { watch, type FSWatcher } from "chokidar";
-import { basename } from "node:path";
+import { basename, resolve as resolvePath, sep } from "node:path";
 import { statSync } from "node:fs";
 import type { Config, ClassificationResult, Rule } from "./types.js";
 import { organizeFile, isDownloading } from "./organizer.js";
@@ -11,22 +11,25 @@ export function startWatcher(
   rules: Rule[],
   aiClassify?: (filename: string, ext: string) => Promise<ClassificationResult>,
 ): FSWatcher {
-  const watcher = watch(config.targetPath, {
+  const targetPath = resolvePath(config.targetPath);
+
+  const watcher = watch(targetPath, {
     ignored: config.ignorePatterns,
     depth: config.recursive ? undefined : 0,
     ignoreInitial: true,
+    followSymlinks: false,
   });
 
   watcher.on("add", (filePath: string) => {
-    handleFileChange(filePath, config, rules, aiClassify);
+    handleFileChange(filePath, targetPath, config, rules, aiClassify);
   });
 
   watcher.on("change", (filePath: string) => {
-    handleFileChange(filePath, config, rules, aiClassify);
+    handleFileChange(filePath, targetPath, config, rules, aiClassify);
   });
 
   watcher.on("ready", () => {
-    console.log(`✅ 监控已就绪: ${config.targetPath}`);
+    console.log(`✅ 监控已就绪: ${targetPath}`);
   });
 
   return watcher;
@@ -34,6 +37,7 @@ export function startWatcher(
 
 function handleFileChange(
   filePath: string,
+  targetPath: string,
   config: Config,
   rules: Rule[],
   aiClassify?: (filename: string, ext: string) => Promise<ClassificationResult>,
@@ -41,26 +45,21 @@ function handleFileChange(
   const existing = pendingTimers.get(filePath);
   if (existing) clearTimeout(existing);
 
-  const timer = setTimeout(() => {
+  const timer = setTimeout(async () => {
     pendingTimers.delete(filePath);
-    if (!isFileStable(filePath, config.stabilityThreshold)) return;
-    processOne(filePath, config, rules, aiClassify);
+    const stable = await isFileStable(filePath, config.stabilityThreshold);
+    if (!stable) return;
+    processOne(filePath, targetPath, rules, config.aiEnabled, aiClassify);
   }, config.stabilityThreshold);
 
   pendingTimers.set(filePath, timer);
 }
 
-/** 两次取样比较文件大小，确认写入已完成 */
-function isFileStable(filePath: string, waitMs: number): boolean {
+async function isFileStable(filePath: string, waitMs: number): Promise<boolean> {
   try {
     const a = statSync(filePath);
     if (a.size === 0) return false;
-
-    // 同步等待不够理想，但对"下载完成"场景足够
-    const start = Date.now();
-    while (Date.now() - start < Math.min(waitMs / 2, 1000)) {
-      // busy-wait briefly — only used for tiny download-completion windows
-    }
+    await new Promise((r) => setTimeout(r, Math.min(waitMs / 2, 1000)));
     const b = statSync(filePath);
     return a.size === b.size && a.mtimeMs === b.mtimeMs;
   } catch {
@@ -70,15 +69,24 @@ function isFileStable(filePath: string, waitMs: number): boolean {
 
 async function processOne(
   filePath: string,
-  config: Config,
+  targetPath: string,
   rules: Rule[],
+  aiEnabled: boolean,
   aiClassify?: (filename: string, ext: string) => Promise<ClassificationResult>,
 ): Promise<void> {
   try {
+    // 防御：确保文件在目标目录内
+    const resolvedFile = resolvePath(filePath);
+    const resolvedTarget = resolvePath(targetPath);
+    if (!resolvedFile.startsWith(resolvedTarget + sep) && resolvedFile !== resolvedTarget) {
+      console.error(`⚠️ 跳过外部文件: ${basename(filePath)}`);
+      return;
+    }
+
     if (isDownloading(filePath)) return;
-    const result = await organizeFile(filePath, config.targetPath, rules, config.aiEnabled, aiClassify);
+    const result = await organizeFile(filePath, resolvedTarget, rules, aiEnabled, aiClassify);
     if (result.success) {
-      console.log(`📁 ${result.category}/${result.fileName}${result.category ? "" : ""}`);
+      console.log(`📁 ${result.category}/${result.fileName}`);
     } else {
       console.error(`❌ ${result.fileName} — ${result.error}`);
     }
